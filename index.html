@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Twin Cities Summer Activities</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a6b3a 0%, #2d9d5f 100%);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    header h1 { font-size: 1.3rem; font-weight: 700; }
+    header p { font-size: 0.8rem; opacity: 0.85; }
+
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 320px;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 2px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: #64748b;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      color: #1a6b3a;
+      border-bottom-color: #1a6b3a;
+      background: #f0fdf4;
+    }
+
+    .tab-panel { display: none; flex: 1; overflow-y: auto; }
+    .tab-panel.active { display: flex; flex-direction: column; }
+
+    /* Filter Panel */
+    .filter-section { padding: 12px; }
+    .filter-section h3 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .search-box:focus { border-color: #2d9d5f; }
+
+    .category-filter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 3px;
+      transition: background 0.15s;
+    }
+    .category-filter:hover { background: #f8fafc; }
+
+    .cat-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .cat-check {
+      margin-left: auto;
+      width: 16px; height: 16px;
+      cursor: pointer;
+      accent-color: #1a6b3a;
+    }
+
+    .cat-label { font-size: 0.82rem; color: #374151; flex: 1; }
+    .cat-count {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    /* Activity List Panel */
+    .activity-list { padding: 8px; }
+
+    .activity-card {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all 0.15s;
+    }
+    .activity-card:hover { background: #f0fdf4; border-color: #bbf7d0; }
+    .activity-card.highlighted { background: #dcfce7; border-color: #4ade80; }
+
+    .ac-name { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+    .ac-location { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+    .ac-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+
+    .tag {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+    .tag-callAhead { background: #fef3c7; color: #92400e; }
+    .tag-free { background: #dcfce7; color: #166534; }
+    .tag-paid { background: #fee2e2; color: #991b1b; }
+    .tag-seasonal { background: #ede9fe; color: #5b21b6; }
+
+    /* At Home Panel */
+    .at-home-section { padding: 12px; }
+    .at-home-category {
+      margin-bottom: 16px;
+    }
+    .at-home-category h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .at-home-item {
+      font-size: 0.82rem;
+      color: #374151;
+      padding: 3px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .at-home-item::before {
+      content: "•";
+      color: #2d9d5f;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* Websites Panel */
+    .websites-section { padding: 12px; }
+    .website-item {
+      padding: 8px 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+    .website-item a {
+      color: #1a6b3a;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .website-item a:hover { text-decoration: underline; }
+    .website-item p { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+    /* Map */
+    #map {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Leaflet popup styling */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+    }
+
+    .popup-content { min-width: 200px; }
+    .popup-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .popup-category {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .popup-location {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .popup-notes {
+      font-size: 0.82rem;
+      color: #374151;
+      background: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border-left: 3px solid #2d9d5f;
+    }
+    .popup-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+
+    .marker-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 2.5px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-size: 14px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .count-badge {
+      background: #1a6b3a;
+      color: white;
+      border-radius: 99px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .toggle-all-btn {
+      font-size: 0.72rem;
+      color: #1a6b3a;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: underline;
+    }
+
+    /* Weekend section */
+    .weekend-section { padding: 12px; }
+
+    .weekend-banner {
+      background: linear-gradient(135deg, #1a6b3a 0%, #2d9d5f 100%);
+      color: white;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+    .weekend-banner h2 { font-size: 0.95rem; font-weight: 700; }
+    .weekend-banner p { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+
+    .weekend-group { margin-bottom: 16px; }
+    .weekend-group-header {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .day-pill {
+      font-size: 0.65rem;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-weight: 700;
+      background: #1a6b3a;
+      color: white;
+    }
+    .day-pill.sunday { background: #0284c7; }
+    .day-pill.both { background: #7c3aed; }
+
+    .weekend-event {
+      padding: 9px 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      margin-bottom: 5px;
+      border-left: 3px solid #e2e8f0;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .weekend-event:hover { background: #f0fdf4; border-left-color: #2d9d5f; }
+    .weekend-event .we-name { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+    .weekend-event .we-loc { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+    .weekend-event .we-note { font-size: 0.75rem; color: #374151; margin-top: 3px; }
+
+    .highlight-card {
+      border-left-color: #e05c00 !important;
+      background: #fff7ed !important;
+    }
+    .highlight-card:hover { background: #ffedd5 !important; }
+
+    @media (max-width: 640px) {
+      #sidebar { width: 260px; }
+      .tab-btn { font-size: 0.65rem; padding: 8px 3px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Twin Cities Summer Activities</h1>
+    <p>Interactive map of family-friendly activities in the Metro area</p>
+  </div>
+</header>
+
+<div class="app-body">
+  <div id="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" onclick="switchTab('filters')">Filters</button>
+      <button class="tab-btn" onclick="switchTab('weekend')">This Weekend</button>
+      <button class="tab-btn" onclick="switchTab('list')">List</button>
+      <button class="tab-btn" onclick="switchTab('athome')">At Home</button>
+      <button class="tab-btn" onclick="switchTab('websites')">Links</button>
+    </div>
+
+    <!-- FILTERS TAB -->
+    <div class="tab-panel active" id="tab-filters">
+      <div class="filter-section">
+        <input class="search-box" type="text" id="searchBox" placeholder="Search activities..." oninput="filterActivities()"/>
+
+        <div class="filter-header">
+          <h3>Categories</h3>
+          <button class="toggle-all-btn" onclick="toggleAll()">Toggle All</button>
+        </div>
+
+        <div id="categoryFilters"></div>
+      </div>
+    </div>
+
+    <!-- THIS WEEKEND TAB -->
+    <div class="tab-panel" id="tab-weekend">
+      <div class="weekend-section" id="weekendContent"></div>
+    </div>
+
+    <!-- LIST TAB -->
+    <div class="tab-panel" id="tab-list">
+      <div class="activity-list" id="activityList"></div>
+    </div>
+
+    <!-- AT HOME TAB -->
+    <div class="tab-panel" id="tab-athome">
+      <div class="at-home-section" id="atHomeContent"></div>
+    </div>
+
+    <!-- WEBSITES TAB -->
+    <div class="tab-panel" id="tab-websites">
+      <div class="websites-section" id="websitesContent"></div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================================
+// CATEGORIES
+// ============================================================
+const CATEGORIES = {
+  attraction:  { label: "Day Trips & Attractions", color: "#e05c00", abbr: "A" },
+  nature:      { label: "Nature & Three Rivers Parks", color: "#2d7a3d", abbr: "N" },
+  playground:  { label: "Parks & Playgrounds", color: "#5a9e2f", abbr: "P" },
+  indoor:      { label: "Indoor Play", color: "#7c3aed", abbr: "I" },
+  pool:        { label: "Pools & Splash Pads", color: "#0284c7", abbr: "W" },
+  beach:       { label: "Beaches", color: "#0891b2", abbr: "B" },
+  festival:    { label: "Festivals & Events", color: "#b45309", abbr: "F" },
+  farm:        { label: "Farms & Pick-Your-Own", color: "#a16207", abbr: "FR" },
+  sports:      { label: "Sports & Entertainment", color: "#be123c", abbr: "S" },
+  museum:      { label: "Museums & Learning", color: "#0e7490", abbr: "M" },
+};
+
+// ============================================================
+// ACTIVITY DATA
+// ============================================================
+const activities = [
+
+  // --- DAY TRIPS & ATTRACTIONS ---
+  { name:"Wild Rumpus Bookstore", cat:"attraction", lat:44.9236, lng:-93.3097,
+    loc:"Linden Hills, Minneapolis (near Lake Harriet)",
+    notes:"Magical independent children's bookstore. Call ahead!", callAhead:true },
+
+  { name:"Minnesota Landscape Arboretum", cat:"nature", lat:44.8600, lng:-93.6147,
+    loc:"Chaska",
+    notes:"Green play area, storytime. Consider membership!", callAhead:true },
+
+  { name:"Como Zoo & Conservatory", cat:"attraction", lat:44.9822, lng:-93.1494,
+    loc:"St. Paul",
+    notes:"Free admission! Great for all ages.", free:true },
+
+  { name:"Minnesota Zoo", cat:"attraction", lat:44.7727, lng:-93.1871,
+    loc:"Apple Valley",
+    notes:"Paid admission. Worth the visit!", paid:true },
+
+  { name:"Minnesota Children's Museum", cat:"museum", lat:44.9480, lng:-93.0957,
+    loc:"St. Paul",
+    notes:"Paid. First Sunday of month is free — must register in advance.", paid:true },
+
+  { name:"Sea Life Minnesota Aquarium", cat:"attraction", lat:44.8549, lng:-93.2422,
+    loc:"Mall of America, Bloomington",
+    notes:"Buy tickets online in advance.", paid:true },
+
+  { name:"Crayola Experience", cat:"attraction", lat:44.8549, lng:-93.2420,
+    loc:"Mall of America, Bloomington",
+    notes:"Membership recommended for best value.", paid:true },
+
+  { name:"Valley Fair", cat:"attraction", lat:44.8019, lng:-93.5536,
+    loc:"Shakopee",
+    notes:"Amusement park. Check for family deals.", paid:true },
+
+  { name:"Minnehaha Falls", cat:"nature", lat:44.9153, lng:-93.2108,
+    loc:"Minneapolis",
+    notes:"Wabun Park nearby has a wading pool! Beautiful waterfall.", free:true },
+
+  { name:"Centennial Lakes Park", cat:"playground", lat:44.8756, lng:-93.3321,
+    loc:"Edina",
+    notes:"Concerts, Farmers Market on Thursdays 4-7pm, fishing.", free:true },
+
+  { name:"Canterbury Park", cat:"sports", lat:44.7741, lng:-93.4689,
+    loc:"Shakopee",
+    notes:"Family day Sundays, $1 on Thursdays. Look for special events.", paid:true },
+
+  { name:"Stillwater", cat:"attraction", lat:45.0563, lng:-92.8063,
+    loc:"Stillwater",
+    notes:"Teddy Bear Park, candy store, trolley ride, storytime at bookstore.", callAhead:true },
+
+  { name:"Franconia Sculpture Park", cat:"attraction", lat:45.3914, lng:-92.7875,
+    loc:"Franconia (near Taylors Falls)",
+    notes:"Free outdoor sculpture park. Combine with hiking along the river.", free:true },
+
+  { name:"Wild Mountain / Taylors Falls", cat:"attraction", lat:45.3983, lng:-92.6565,
+    loc:"Taylors Falls",
+    notes:"Water park, scenic overlooks. Great day trip.", paid:true },
+
+  { name:"Jackson Roundhouse (MN Transportation Museum)", cat:"museum", lat:44.9458, lng:-93.1189,
+    loc:"St. Paul",
+    notes:"Saturday train rides! Call ahead for schedule.", callAhead:true, paid:true },
+
+  { name:"Fawn-Do-Rosa", cat:"farm", lat:45.3800, lng:-92.6800,
+    loc:"Taylors Falls area",
+    notes:"Petting area. Check website for days and times open.", callAhead:true },
+
+  { name:"Mississippi Gateway Regional Park", cat:"nature", lat:45.0833, lng:-93.3733,
+    loc:"Brooklyn Park",
+    notes:"Great regional park along the Mississippi River." },
+
+  { name:"Bauer Berry Farm", cat:"farm", lat:44.7747, lng:-93.5547,
+    loc:"Shakopee area",
+    notes:"Strawberry picking! Seasonal — call ahead.", seasonal:true, callAhead:true },
+
+  { name:"Afton Apple Orchard", cat:"farm", lat:44.9008, lng:-92.7908,
+    loc:"Afton",
+    notes:"Apple picking in fall. Strawberries in summer.", seasonal:true },
+
+  { name:"Rush River Produce", cat:"farm", lat:44.5583, lng:-92.2583,
+    loc:"Maiden Rock, Wisconsin",
+    notes:"Blueberry picking! Worth the drive.", seasonal:true },
+
+  { name:"Ferguson's MN Harvest", cat:"farm", lat:44.6500, lng:-93.6300,
+    loc:"Jordan",
+    notes:"Fall harvest activities. Check for seasonal schedule.", seasonal:true },
+
+  { name:"Carlson's Llamas", cat:"farm", lat:44.8508, lng:-93.7869,
+    loc:"Waconia",
+    notes:"Llama farm. Paid admission.", paid:true, callAhead:true },
+
+  { name:"Great Wolf Lodge", cat:"attraction", lat:44.8390, lng:-93.3900,
+    loc:"Bloomington",
+    notes:"Indoor water park resort. Book in advance!", paid:true },
+
+  { name:"Minneopa State Park", cat:"nature", lat:44.1636, lng:-93.9994,
+    loc:"Near Mankato",
+    notes:"Camping, bison herd, beautiful waterfalls. Great longer day trip!", paid:true },
+
+  { name:"Science Museum of Minnesota", cat:"museum", lat:44.9430, lng:-93.1011,
+    loc:"St. Paul",
+    notes:"3rd Sunday of the month is free. Better for older kids.", callAhead:true },
+
+  { name:"Bell Museum", cat:"museum", lat:44.9817, lng:-93.1808,
+    loc:"University of MN, St. Paul campus",
+    notes:"Natural history and planetarium." },
+
+  { name:"Mall of America", cat:"attraction", lat:44.8549, lng:-93.2422,
+    loc:"Bloomington",
+    notes:"Toddler Tuesdays, Build-a-Bear birthday deal, indoor amusement park.", paid:true },
+
+  { name:"Mill City Museum", cat:"museum", lat:44.9797, lng:-93.2572,
+    loc:"Minneapolis",
+    notes:"Free for children under 5!", free:true },
+
+  { name:"Walker Art Center & Sculpture Garden", cat:"museum", lat:44.9686, lng:-93.2886,
+    loc:"Minneapolis",
+    notes:"First Saturday of the month is free for kids.", free:true },
+
+  { name:"Fort Snelling State Park", cat:"nature", lat:44.8928, lng:-93.1808,
+    loc:"St. Paul",
+    notes:"State park with beaches, hiking, history." },
+
+  { name:"MN History Center", cat:"museum", lat:44.9536, lng:-93.1011,
+    loc:"St. Paul",
+    notes:"Great museum for history lovers." },
+
+  { name:"Lake Minnetonka Boat Rides", cat:"attraction", lat:44.9036, lng:-93.5660,
+    loc:"Excelsior",
+    notes:"Boat rides from Excelsior. Steamboat museum nearby.", paid:true },
+
+  { name:"National Eagle Center (Red Wing area)", cat:"attraction", lat:44.5633, lng:-92.5333,
+    loc:"Wabasha / Red Wing",
+    notes:"Eagle center, Lake Pepin, Lark Toy Store nearby. Great road trip!", paid:true },
+
+  { name:"The Works Museum", cat:"museum", lat:44.8380, lng:-93.3960,
+    loc:"Bloomington",
+    notes:"STEM-focused children's museum." },
+
+  { name:"Kiddywampus (Hopkins)", cat:"attraction", lat:44.9250, lng:-93.4116,
+    loc:"Hopkins",
+    notes:"Toy store and play space." },
+
+  { name:"Animal Humane Society", cat:"attraction", lat:44.9911, lng:-93.3594,
+    loc:"Golden Valley",
+    notes:"Visit with the animals. Great for animal-loving kids.", free:true },
+
+  { name:"Woodlake Nature Center", cat:"nature", lat:44.8700, lng:-93.2830,
+    loc:"Richfield",
+    notes:"Nature center with trails. Check website for programs.", callAhead:true },
+
+  { name:"Bachmans on Lyndale", cat:"attraction", lat:44.9408, lng:-93.2886,
+    loc:"Minneapolis",
+    notes:"Lovely greenhouse and garden center — fun to explore.", free:true },
+
+  { name:"Flying Cloud Airport Plane Watching", cat:"attraction", lat:44.8283, lng:-93.4622,
+    loc:"Eden Prairie",
+    notes:"Watch small planes take off and land from observation areas.", free:true },
+
+  { name:"MSP Airport Plane Watching", cat:"attraction", lat:44.8828, lng:-93.2097,
+    loc:"Minneapolis/St. Paul",
+    notes:"Post Road observation area for plane watching.", free:true },
+
+  { name:"Duluth: Spirit Mountain Adventure Park", cat:"attraction", lat:46.7208, lng:-92.2291,
+    loc:"Duluth",
+    notes:"Great road trip destination! Adventure park at Spirit Mountain ski resort.", paid:true },
+
+  { name:"Swedish Institute Play Area", cat:"museum", lat:44.9686, lng:-93.2758,
+    loc:"Minneapolis",
+    notes:"Nordic cultural museum with children's play area. Group rate available.", paid:true },
+
+  { name:"Sustainable Safari", cat:"attraction", lat:44.7677, lng:-93.2777,
+    loc:"Burnsville",
+    notes:"Wildlife encounters and education." },
+
+  { name:"Furball Farm", cat:"farm", lat:44.2958, lng:-93.2694,
+    loc:"Faribault",
+    notes:"Rabbit and small animal farm. Call for hours.", callAhead:true },
+
+  { name:"Nerstrand Big Woods State Park", cat:"nature", lat:44.3525, lng:-93.1183,
+    loc:"Near Northfield",
+    notes:"Beautiful old-growth forest. Great hiking." },
+
+  { name:"Frontenac State Park", cat:"nature", lat:44.5483, lng:-92.3583,
+    loc:"Red Wing area",
+    notes:"Great views of Lake Pepin. Hiking and bird watching." },
+
+  { name:"Oliver Kelly Farm", cat:"farm", lat:45.2994, lng:-93.5658,
+    loc:"Elk River",
+    notes:"Living history farm operated by NPS. Fun and educational!", paid:true },
+
+  { name:"Bluey Camp Store (Southdale)", cat:"attraction", lat:44.8764, lng:-93.3244,
+    loc:"Edina",
+    notes:"Kids love the Bluey-themed store." },
+
+  { name:"St. Croix River Train Rides", cat:"attraction", lat:45.0563, lng:-92.8063,
+    loc:"Stillwater area",
+    notes:"Scenic train rides along the St. Croix River." },
+
+  { name:"Three Bears Play Den", cat:"indoor", lat:44.8508, lng:-93.7869,
+    loc:"Waconia",
+    notes:"Indoor play cafe. Great on rainy days!", paid:true },
+
+  { name:"Home Depot / Menards Kids Projects", cat:"attraction", lat:44.8547, lng:-93.4708,
+    loc:"Eden Prairie (and other locations)",
+    notes:"Kids build projects with parents — check for activity weekends.", free:true },
+
+  // --- THREE RIVERS PARK DISTRICT ---
+  { name:"Gale Woods Farm (Three Rivers)", cat:"farm", lat:44.9419, lng:-93.7519,
+    loc:"Minnetrista",
+    notes:"Working farm open to the public through Three Rivers Park District." },
+
+  { name:"Richardson Nature Center (Three Rivers)", cat:"nature", lat:44.8497, lng:-93.3690,
+    loc:"Bloomington",
+    notes:"Three Rivers Park District. Nature programs and trails." },
+
+  { name:"Lowry Nature Center (Three Rivers)", cat:"nature", lat:44.8611, lng:-93.6611,
+    loc:"Victoria",
+    notes:"Three Rivers Park District. Nature classes and trails." },
+
+  { name:"Lake Minnetonka Regional Park (Three Rivers)", cat:"beach", lat:44.9569, lng:-93.6139,
+    loc:"Minnetrista / Orono",
+    notes:"Daily and seasonal rates. Beach, trails, and boat launch.", paid:true },
+
+  { name:"Bryant Lake Regional Park (Three Rivers)", cat:"beach", lat:44.8667, lng:-93.4333,
+    loc:"Eden Prairie",
+    notes:"Beach and playground. Free! Three Rivers Park District.", free:true },
+
+  { name:"Hyland Lake Park Reserve (Three Rivers)", cat:"playground", lat:44.8608, lng:-93.3619,
+    loc:"Bloomington",
+    notes:"Chutes & Ladders play area — good for older kids. Can be overwhelming for toddlers." },
+
+  { name:"The Landing (Three Rivers)", cat:"attraction", lat:44.7936, lng:-93.5069,
+    loc:"Shakopee",
+    notes:"1800s living history village through Three Rivers Park District.", paid:true },
+
+  { name:"Lake Rebecca Park Reserve (Three Rivers)", cat:"playground", lat:45.0072, lng:-93.7622,
+    loc:"Rockford area",
+    notes:"Great playground! Three Rivers Park District.", free:true },
+
+  { name:"Lake Minnewashta Regional Park (Three Rivers)", cat:"beach", lat:44.8786, lng:-93.5731,
+    loc:"Chanhassen",
+    notes:"Three Rivers Park District. Beach and trails.", paid:true },
+
+  // --- PARKS & PLAYGROUNDS (Eden Prairie & nearby) ---
+  { name:"Staring Lake Park", cat:"playground", lat:44.8333, lng:-93.4422,
+    loc:"Eden Prairie",
+    notes:"Tuesday Kids' Concerts (10:30am) at amphitheater. Outdoor center with play area and trails." },
+
+  { name:"Miller Park", cat:"pool", lat:44.8619, lng:-93.4708,
+    loc:"Eden Prairie (Eden Prairie Rd & 212)",
+    notes:"Splash pad and park.", free:true },
+
+  { name:"Lake Riley Park", cat:"beach", lat:44.8283, lng:-93.4422,
+    loc:"Eden Prairie",
+    notes:"Fenced playground plus beach with lifeguards." },
+
+  { name:"Round Lake Park", cat:"pool", lat:44.8722, lng:-93.4708,
+    loc:"Eden Prairie",
+    notes:"Splash pad and park." },
+
+  { name:"Bandemiere Park", cat:"playground", lat:44.8486, lng:-93.4486,
+    loc:"Eden Prairie (101 & Lake Riley Rd)",
+    notes:"Neighborhood park and playground." },
+
+  { name:"Lebanon Hills Regional Park", cat:"nature", lat:44.7727, lng:-93.1869,
+    loc:"Eagan",
+    notes:"Great regional park with beach and trails." },
+
+  { name:"Rosaland Park", cat:"playground", lat:44.8897, lng:-93.3599,
+    loc:"Edina",
+    notes:"Nice neighborhood park." },
+
+  { name:"Nesbitt Preserve Park", cat:"pool", lat:44.8694, lng:-93.4272,
+    loc:"Eden Prairie",
+    notes:"Splash pad too! Good for younger children." },
+
+  { name:"Scraper Park (Ninja Warrior Playground)", cat:"playground", lat:44.9911, lng:-93.3594,
+    loc:"Golden Valley",
+    notes:"Ninja Warrior-style playground — super fun for kids!" },
+
+  { name:"Lakefront Park", cat:"playground", lat:44.7175, lng:-93.4219,
+    loc:"Prior Lake",
+    notes:"Nice lakefront park and playground." },
+
+  { name:"Grassman Park (Ninja Playground)", cat:"playground", lat:44.6694, lng:-93.6300,
+    loc:"Jordan",
+    notes:"Ninja warrior playground near the Big Candy Store in Jordan." },
+
+  { name:"Westwood Hills Nature Center", cat:"nature", lat:44.9486, lng:-93.3486,
+    loc:"St. Louis Park",
+    notes:"Great nature center with trails and programs." },
+
+  { name:"Central Park", cat:"playground", lat:45.0725, lng:-93.4558,
+    loc:"Maple Grove",
+    notes:"Large community park." },
+
+  { name:"Huber Park", cat:"playground", lat:44.7977, lng:-93.5269,
+    loc:"Shakopee",
+    notes:"Park along the Minnesota River." },
+
+  { name:"Shoreview Commons Park", cat:"playground", lat:45.0844, lng:-93.1344,
+    loc:"Shoreview",
+    notes:"Large community park with splash pad." },
+
+  { name:"Fireman's Park", cat:"pool", lat:44.7897, lng:-93.6069,
+    loc:"Chaska",
+    notes:"Splash pad and park." },
+
+  { name:"Veterans Memorial Park", cat:"playground", lat:44.8833, lng:-93.2833,
+    loc:"Richfield",
+    notes:"Mini golf nearby." },
+
+  { name:"Moir Park", cat:"playground", lat:44.8408, lng:-93.3771,
+    loc:"Bloomington",
+    notes:"Concert series on Monday evenings." },
+
+  { name:"Pioneer Park", cat:"playground", lat:44.8525, lng:-93.4500,
+    loc:"Eden Prairie (behind Senior Center)",
+    notes:"Good for younger children." },
+
+  // --- INDOOR PLAY ---
+  { name:"Edinborough Park", cat:"indoor", lat:44.8764, lng:-93.3244,
+    loc:"Edina",
+    notes:"Indoor park with kids concerts and large climbing structure. Call ahead!", callAhead:true, paid:true },
+
+  { name:"Eden Prairie Community Center", cat:"indoor", lat:44.8547, lng:-93.4708,
+    loc:"Eden Prairie",
+    notes:"Toddler open gym. Indoor pool with toddler-only time 9am-noon.", callAhead:true, paid:true },
+
+  { name:"Chaska Community Center", cat:"indoor", lat:44.7897, lng:-93.6069,
+    loc:"Chaska",
+    notes:"Indoor pool, outdoor splash pad, and indoor play area.", callAhead:true, paid:true },
+
+  { name:"Good Times Park", cat:"indoor", lat:44.8041, lng:-93.1669,
+    loc:"Eagan",
+    notes:"Indoor play. Call ahead for hours!", callAhead:true, paid:true },
+
+  { name:"Playworks", cat:"indoor", lat:44.7977, lng:-93.5269,
+    loc:"Shakopee",
+    notes:"Indoor play center. Call ahead!", callAhead:true, paid:true },
+
+  { name:"Sky Zone", cat:"indoor", lat:44.8897, lng:-93.3499,
+    loc:"Edina",
+    notes:"Trampoline park. Check for Little Leapers times for toddlers.", paid:true },
+
+  { name:"Pump It Up", cat:"indoor", lat:44.8547, lng:-93.4708,
+    loc:"Eden Prairie",
+    notes:"Inflatable bounce house play center.", paid:true },
+
+  { name:"Ridgedale Playmuseum", cat:"indoor", lat:44.9211, lng:-93.4689,
+    loc:"Minnetonka (Ridgedale Mall)",
+    notes:"Play museum in the mall. Paid admission.", paid:true },
+
+  { name:"Safari Island", cat:"indoor", lat:44.8508, lng:-93.7869,
+    loc:"Waconia",
+    notes:"Indoor play center.", paid:true },
+
+  { name:"Plymouth Community Center (The Kube)", cat:"indoor", lat:44.9697, lng:-93.4697,
+    loc:"Plymouth",
+    notes:"Community center with indoor play.", paid:true },
+
+  { name:"We Rock the Spectrum", cat:"indoor", lat:44.9239, lng:-92.9594,
+    loc:"Woodbury (also Eagan)",
+    notes:"Inclusive indoor gym for kids of all abilities.", paid:true },
+
+  { name:"Wild Things Indoor Playground", cat:"indoor", lat:44.6496, lng:-93.2427,
+    loc:"Lakeville",
+    notes:"Large indoor playground.", paid:true },
+
+  { name:"Maple Grove Community Center", cat:"indoor", lat:45.0725, lng:-93.4558,
+    loc:"Maple Grove",
+    notes:"Indoor play and community programs. Call ahead!", callAhead:true },
+
+  { name:"Brookview Play Area", cat:"indoor", lat:44.9911, lng:-93.3594,
+    loc:"Golden Valley",
+    notes:"Indoor play area.", callAhead:true },
+
+  // --- POOLS & SPLASH PADS ---
+  { name:"Oak Hill Park Splash Pad", cat:"pool", lat:44.9486, lng:-93.3486,
+    loc:"St. Louis Park",
+    notes:"Free splash pad.", free:true },
+
+  { name:"Wabun Wading Pool", cat:"pool", lat:44.9153, lng:-93.2108,
+    loc:"Minnehaha Falls, Minneapolis",
+    notes:"Gated wading pool near Minnehaha Falls.", free:true },
+
+  { name:"Homeward Hills Park Splash Pad", cat:"pool", lat:44.8486, lng:-93.4350,
+    loc:"Eden Prairie",
+    notes:"New splash pad (check if open).", free:true },
+
+  { name:"Burns Park Splash Pad", cat:"pool", lat:44.9250, lng:-93.4116,
+    loc:"Hopkins",
+    notes:"Park and splash pad." },
+
+  { name:"Apple Valley Water Park", cat:"pool", lat:44.7319, lng:-93.2175,
+    loc:"Apple Valley",
+    notes:"Outdoor water park.", paid:true },
+
+  { name:"Cascade Bay Water Park", cat:"pool", lat:44.8041, lng:-93.1669,
+    loc:"Eagan",
+    notes:"Outdoor water park with slides.", paid:true },
+
+  { name:"Sandventure Water Park", cat:"pool", lat:44.7977, lng:-93.5269,
+    loc:"Shakopee",
+    notes:"Water park.", paid:true },
+
+  { name:"Bielenberg Splash Pad", cat:"pool", lat:44.9239, lng:-92.9594,
+    loc:"Woodbury",
+    notes:"Community splash pad.", free:true },
+
+  { name:"Cedarcrest Park Splash Pad", cat:"pool", lat:44.8408, lng:-93.3771,
+    loc:"Bloomington",
+    notes:"Thursday mornings program.", free:true },
+
+  { name:"Williston Splash Pad (Indoor)", cat:"pool", lat:44.9211, lng:-93.4689,
+    loc:"Minnetonka",
+    notes:"Indoor splash pad." },
+
+  // --- BEACHES ---
+  { name:"Bush Lake Beach", cat:"beach", lat:44.8497, lng:-93.3690,
+    loc:"Bloomington",
+    notes:"Nice lake beach." },
+
+  { name:"Riley Lake Beach", cat:"beach", lat:44.8283, lng:-93.4422,
+    loc:"Eden Prairie",
+    notes:"Fenced playground nearby." },
+
+  { name:"Lake Harriet Beach", cat:"beach", lat:44.9233, lng:-93.3108,
+    loc:"Minneapolis",
+    notes:"Beautiful city lake with rose garden nearby." },
+
+  { name:"Lake Nokomis Beach", cat:"beach", lat:44.9083, lng:-93.2397,
+    loc:"Minneapolis",
+    notes:"Popular south Minneapolis lake with beaches." },
+
+  { name:"Bde Maka Ska Beach", cat:"beach", lat:44.9411, lng:-93.3122,
+    loc:"Minneapolis",
+    notes:"Multiple beaches on this city lake." },
+
+  { name:"Shady Oak Beach", cat:"beach", lat:44.9211, lng:-93.4689,
+    loc:"Minnetonka",
+    notes:"Paid admission.", paid:true },
+
+  { name:"Lake Ann Beach", cat:"beach", lat:44.8619, lng:-93.5308,
+    loc:"Chanhassen",
+    notes:"Nice community beach." },
+
+  { name:"Excelsior Beach", cat:"beach", lat:44.9036, lng:-93.5660,
+    loc:"Excelsior",
+    notes:"Charming beach in downtown Excelsior." },
+
+  // --- SPORTS & ENTERTAINMENT ---
+  { name:"Target Field (Twins Games)", cat:"sports", lat:44.9817, lng:-93.2783,
+    loc:"Minneapolis",
+    notes:"Kids Day on Sundays. Check for family deals.", paid:true },
+
+  { name:"CHS Field (Saints Games)", cat:"sports", lat:44.9547, lng:-93.0733,
+    loc:"St. Paul",
+    notes:"Minor league baseball. Great family atmosphere.", paid:true },
+
+  { name:"Allianz Field (Loons / MN United)", cat:"sports", lat:44.9539, lng:-93.1636,
+    loc:"St. Paul",
+    notes:"Drone Art Show July 10-11. Soccer games.", paid:true },
+
+  { name:"Target Center (Lynx Games)", cat:"sports", lat:44.9794, lng:-93.2761,
+    loc:"Minneapolis",
+    notes:"Minnesota Lynx WNBA games.", paid:true },
+
+  { name:"Mini Golf - Veterans Memorial Park", cat:"sports", lat:44.8833, lng:-93.2833,
+    loc:"Richfield",
+    notes:"Mini golf course." },
+
+  { name:"Bowling: Pinstripes", cat:"sports", lat:44.8897, lng:-93.3499,
+    loc:"Edina",
+    notes:"Upscale bowling and bocce. Check kidsbowlfree.com for deals." },
+
+  { name:"Scheels", cat:"attraction", lat:44.8547, lng:-93.4708,
+    loc:"Eden Prairie",
+    notes:"Ferris wheel and rollerball upstairs! Free to browse." },
+
+  // --- FESTIVALS ---
+  { name:"Raspberry Festival", cat:"festival", lat:44.9250, lng:-93.4116,
+    loc:"Hopkins",
+    notes:"July 15-19. Big community festival!" },
+
+  { name:"Lumberjack Days", cat:"festival", lat:45.0563, lng:-92.8063,
+    loc:"Stillwater",
+    notes:"July 17-19. Great family festival in historic Stillwater." },
+
+  { name:"Leprechaun Days", cat:"festival", lat:44.7433, lng:-93.0697,
+    loc:"Rosemount",
+    notes:"July 18-25." },
+
+  { name:"Edina Art Fair", cat:"festival", lat:44.8897, lng:-93.3499,
+    loc:"Edina",
+    notes:"June 5. Outdoor art fair." },
+
+  { name:"Drone Art Show", cat:"festival", lat:44.9539, lng:-93.1636,
+    loc:"Allianz Field, St. Paul",
+    notes:"July 10-11. Spectacular drone light show!" },
+
+  { name:"Monarch Festival", cat:"festival", lat:44.9083, lng:-93.2397,
+    loc:"Lake Nokomis, Minneapolis",
+    notes:"September 12. Monarch butterfly celebration." },
+
+  { name:"Apple Days", cat:"festival", lat:44.9036, lng:-93.5660,
+    loc:"Excelsior",
+    notes:"September. Apple festival in charming Excelsior." },
+
+  { name:"Nickle Dickle Days", cat:"festival", lat:44.8508, lng:-93.7869,
+    loc:"Waconia",
+    notes:"September. Community festival." },
+
+  { name:"Fiesta Latina", cat:"festival", lat:44.9537, lng:-93.0900,
+    loc:"St. Paul",
+    notes:"September 19. Cultural festival. Hosted by Clues Association." },
+
+  { name:"State Fair (Carver County)", cat:"festival", lat:44.8508, lng:-93.7869,
+    loc:"Waconia (Carver County Fairgrounds)",
+    notes:"August. County fair — great for families!" },
+
+  { name:"Farmer's Market - Minneapolis", cat:"attraction", lat:44.9828, lng:-93.2864,
+    loc:"Minneapolis",
+    notes:"Saturdays (and more). Great produce and activities." },
+
+  { name:"Farmer's Market - Hopkins", cat:"attraction", lat:44.9250, lng:-93.4116,
+    loc:"Hopkins",
+    notes:"Check local schedule for times." },
+
+  { name:"Farmer's Market - Chanhassen", cat:"attraction", lat:44.8619, lng:-93.5308,
+    loc:"Chanhassen",
+    notes:"Local farmers market." },
+
+  // --- MUSEUMS/LEARNING ---
+  { name:"Sponsel's Apple Orchard / Apple Jacks", cat:"farm", lat:44.8619, lng:-93.6135,
+    loc:"Near Arboretum",
+    notes:"Apple orchard and big candy store nearby in Jordan.", seasonal:true },
+
+];
+
+// ============================================================
+// AT HOME ACTIVITIES
+// ============================================================
+const atHomeActivities = {
+  "Water Fun": [
+    "Sprinklers, slip-n-slides, kiddie pools",
+    "Squirt bottles and squirt guns",
+    "Water balloons — play baseball with them!",
+    "Sand and water table / water play with a plastic tub",
+    "Bucket of sudsy water with paint brushes",
+    "Stomp rockets and water rockets",
+    "Umbrella and hose 'it's raining' game",
+    "Shaving cream fun in the sprinkler",
+  ],
+  "Outdoor Play": [
+    "Sandbox, bubbles, and mudpies",
+    "Tricycles, scooters, roller skates",
+    "Red light / green light, capture the flag",
+    "Hide and seek with flashlights at night",
+    "Bug & frog hunts / worm hunting",
+    "Kite flying",
+    "Sidewalk chalk and paint — make chalk bombs",
+    "Obstacle courses (spray paint shapes on lawn)",
+    "Bonfires, roast marshmallows and hot dogs",
+    "Tents in the backyard and fishing",
+    "Races around the house with a stopwatch",
+    "Parades and puppet shows",
+    "Fairy gardens",
+    "Paint rocks — do a rock hunt in the neighborhood",
+    "Lemonade and popsicle stands",
+    "Draw roads with chalk, play cars",
+    "Magnatiles on the garage door",
+    "Play games at night",
+  ],
+  "Creative & Crafts": [
+    "Arts and crafts — tie dye, paint wooden birdhouses",
+    "Making books and stories — illustrate and write",
+    "Photography with a kids camera",
+    "Window paint + painters tape to make stained glass look",
+    "Playdough and slime",
+    "Pipe cleaners and beads through a colander",
+    "Jump rope, hopscotch, hula hoop",
+    "Moon Sand: 8 cups flour + 1 cup baby/coconut oil",
+    "Butterfly kit and garden, ant farm",
+    "Sensory bin activities",
+  ],
+  "Nature & Learning": [
+    "Gardening — plant vegetables or flowers",
+    "Bird watching and nature scavenger hunts",
+    "Bug 'vacuum' and insect identification",
+    "Science experiments — baking soda + vinegar volcanoes",
+    "Walks and picnics in nature",
+  ],
+  "Helpers & Life Skills": [
+    "Washing cars, bikes, toys, and Hot Wheels",
+    "Cooking and baking together",
+    "Backyard tea parties and picnic lunches",
+  ],
+  "Seasonal & Special": [
+    "Picnics and pinatas",
+    "Build a fort using big cardboard boxes",
+    "Play soccer, basketball, tag",
+    "Backyard campfire and s'mores",
+    "Mud kitchen (pots, pans, outside)",
+    "Obstacle course with stopwatch timing",
+  ],
+};
+
+// ============================================================
+// HELPFUL WEBSITES
+// ============================================================
+const websites = [
+  { url:"https://www.threeriversparks.org", label:"Three Rivers Park District", desc:"Extensive county park system — trails, nature classes, farms, beaches" },
+  { url:"https://www.edenprairie.org", label:"Eden Prairie Parks & Rec", desc:"Eden Prairie city parks and programs" },
+  { url:"https://familyfuntwincities.com", label:"Family Fun Twin Cities", desc:"Local family activity ideas and events" },
+  { url:"https://msp.kidsoutandabout.com", label:"Kids Out and About MSP", desc:"Things to do with kids in the Twin Cities" },
+  { url:"https://www.minnesotahistoricalsociety.org", label:"Minnesota Historical Society", desc:"MN History Center and historic sites" },
+  { url:"https://twincitiesmoms.com", label:"Twin Cities Moms", desc:"Local parenting community and resources" },
+  { url:"https://macaronikid.com", label:"Macaroni Kid", desc:"Family event listings" },
+  { url:"https://twincitiesfrugalmom.com", label:"Twin Cities Frugal Mom", desc:"Kids eat free resources and deals" },
+  { url:"https://www.dnr.state.mn.us", label:"Minnesota DNR", desc:"State parks, I-Camp program, trail guides" },
+  { url:"https://www.exploreminnesota.com", label:"Explore Minnesota", desc:"Official MN tourism and activities" },
+  { url:"https://www.minneapolis.org", label:"Meet Minneapolis", desc:"Minneapolis attractions and events" },
+  { url:"https://www.visitsaintpaul.com", label:"Visit Saint Paul", desc:"St. Paul tourism and events" },
+  { url:"https://www.minnesotaparent.com", label:"Minnesota Parent", desc:"Parenting resources and activity ideas" },
+  { url:"https://www.kidsbowlfree.com", label:"Kids Bowl Free", desc:"Free bowling pass program — once a week!" },
+];
+
+// ============================================================
+// MAP SETUP
+// ============================================================
+const map = L.map('map').setView([44.88, -93.35], 10);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+let markers = [];
+let activeCategories = new Set(Object.keys(CATEGORIES));
+let searchTerm = "";
+
+function makeIcon(cat) {
+  const c = CATEGORIES[cat];
+  return L.divIcon({
+    className: '',
+    html: `<div class="marker-icon" style="width:28px;height:28px;background:${c.color};font-size:11px">${c.abbr}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16]
+  });
+}
+
+function makePopup(a) {
+  const c = CATEGORIES[a.cat];
+  const tags = [];
+  if (a.callAhead) tags.push(`<span class="tag tag-callAhead">Call Ahead</span>`);
+  if (a.free) tags.push(`<span class="tag tag-free">Free</span>`);
+  if (a.paid) tags.push(`<span class="tag tag-paid">Paid</span>`);
+  if (a.seasonal) tags.push(`<span class="tag tag-seasonal">Seasonal</span>`);
+
+  return `<div class="popup-content">
+    <div class="popup-name">${a.name}</div>
+    <div class="popup-category" style="color:${c.color}">${c.label}</div>
+    <div class="popup-location">${a.loc}</div>
+    ${a.notes ? `<div class="popup-notes">${a.notes}</div>` : ''}
+    ${tags.length ? `<div class="popup-tags">${tags.join('')}</div>` : ''}
+  </div>`;
+}
+
+function renderMarkers() {
+  markers.forEach(m => map.removeLayer(m.marker));
+  markers = [];
+
+  const term = searchTerm.toLowerCase();
+  activities.forEach(a => {
+    if (!activeCategories.has(a.cat)) return;
+    if (term && !a.name.toLowerCase().includes(term) && !a.loc.toLowerCase().includes(term) && !(a.notes||'').toLowerCase().includes(term)) return;
+
+    const marker = L.marker([a.lat, a.lng], { icon: makeIcon(a.cat) })
+      .addTo(map)
+      .bindPopup(makePopup(a), { maxWidth: 280 });
+    markers.push({ marker, activity: a });
+  });
+}
+
+function renderCategoryFilters() {
+  const container = document.getElementById('categoryFilters');
+  container.innerHTML = '';
+
+  Object.entries(CATEGORIES).forEach(([key, cat]) => {
+    const count = activities.filter(a => a.cat === key).length;
+    const checked = activeCategories.has(key);
+    const div = document.createElement('label');
+    div.className = 'category-filter';
+    div.innerHTML = `
+      <div class="cat-dot" style="background:${cat.color}"></div>
+      <span class="cat-label">${cat.label}</span>
+      <span class="cat-count">${count}</span>
+      <input type="checkbox" class="cat-check" ${checked ? 'checked' : ''}/>
+    `;
+    div.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) activeCategories.add(key);
+      else activeCategories.delete(key);
+      renderMarkers();
+      renderActivityList();
+    });
+    container.appendChild(div);
+  });
+}
+
+function renderActivityList() {
+  const container = document.getElementById('activityList');
+  const term = searchTerm.toLowerCase();
+
+  const visible = activities.filter(a => {
+    if (!activeCategories.has(a.cat)) return false;
+    if (term && !a.name.toLowerCase().includes(term) && !a.loc.toLowerCase().includes(term)) return false;
+    return true;
+  });
+
+  container.innerHTML = visible.length === 0
+    ? `<p style="padding:20px;color:#94a3b8;text-align:center">No activities match your filters.</p>`
+    : '';
+
+  visible.forEach(a => {
+    const c = CATEGORIES[a.cat];
+    const tags = [];
+    if (a.callAhead) tags.push(`<span class="tag tag-callAhead">Call Ahead</span>`);
+    if (a.free) tags.push(`<span class="tag tag-free">Free</span>`);
+    if (a.paid) tags.push(`<span class="tag tag-paid">Paid</span>`);
+    if (a.seasonal) tags.push(`<span class="tag tag-seasonal">Seasonal</span>`);
+
+    const card = document.createElement('div');
+    card.className = 'activity-card';
+    card.innerHTML = `
+      <div class="ac-name" style="border-left:3px solid ${c.color};padding-left:6px">${a.name}</div>
+      <div class="ac-location">${a.loc}</div>
+      ${tags.length ? `<div class="ac-tags">${tags.join('')}</div>` : ''}
+    `;
+    card.addEventListener('click', () => {
+      map.setView([a.lat, a.lng], 14);
+      const found = markers.find(m => m.activity === a);
+      if (found) found.marker.openPopup();
+      switchTab('list');
+    });
+    container.appendChild(card);
+  });
+}
+
+function renderAtHome() {
+  const container = document.getElementById('atHomeContent');
+  Object.entries(atHomeActivities).forEach(([cat, items]) => {
+    const section = document.createElement('div');
+    section.className = 'at-home-category';
+    section.innerHTML = `<h3>${cat}</h3>` +
+      items.map(i => `<div class="at-home-item">${i}</div>`).join('');
+    container.appendChild(section);
+  });
+}
+
+function renderWebsites() {
+  const container = document.getElementById('websitesContent');
+  websites.forEach(w => {
+    const div = document.createElement('div');
+    div.className = 'website-item';
+    div.innerHTML = `<a href="${w.url}" target="_blank" rel="noopener">${w.label}</a>
+      <p>${w.desc}</p>`;
+    container.appendChild(div);
+  });
+}
+
+function filterActivities() {
+  searchTerm = document.getElementById('searchBox').value;
+  renderMarkers();
+  renderActivityList();
+}
+
+function toggleAll() {
+  const allOn = activeCategories.size === Object.keys(CATEGORIES).length;
+  activeCategories = allOn ? new Set() : new Set(Object.keys(CATEGORIES));
+  renderCategoryFilters();
+  renderMarkers();
+  renderActivityList();
+}
+
+// ============================================================
+// THIS WEEKEND DATA
+// ============================================================
+const weekendEventsData = {
+  // date-ranged: { name, startMonth(1-based), startDay, endMonth, endDay, loc, notes, lat, lng }
+  dateBased: [
+    { name:"Edina Art Fair", startMonth:6, startDay:5, endMonth:6, endDay:7,
+      loc:"50th & France, Edina", notes:"Annual outdoor art fair — ends Sunday!", lat:44.8992, lng:-93.3244 },
+    { name:"Schooner Days", startMonth:5, startDay:29, endMonth:5, endDay:31,
+      loc:"Lake Minnetonka / Excelsior", notes:"Sailing festival on the lake.", lat:44.9036, lng:-93.5660 },
+    { name:"Drone Art Show", startMonth:7, startDay:10, endMonth:7, endDay:11,
+      loc:"Allianz Field, St. Paul", notes:"Spectacular drone light show.", lat:44.9539, lng:-93.1636 },
+    { name:"Raspberry Festival", startMonth:7, startDay:15, endMonth:7, endDay:19,
+      loc:"Hopkins", notes:"Big community festival with rides and events.", lat:44.9250, lng:-93.4116 },
+    { name:"Leprechaun Days", startMonth:7, startDay:18, endMonth:7, endDay:25,
+      loc:"Rosemount", notes:"Community festival with lots of family fun.", lat:44.7433, lng:-93.0697 },
+    { name:"Lumberjack Days", startMonth:7, startDay:17, endMonth:7, endDay:19,
+      loc:"Stillwater", notes:"Historic Stillwater's big summer festival.", lat:45.0563, lng:-92.8063 },
+    { name:"Fiesta Latina", startMonth:9, startDay:19, endMonth:9, endDay:19,
+      loc:"St. Paul", notes:"Cultural festival. Hosted by Clues Association.", lat:44.9537, lng:-93.0900 },
+    { name:"Monarch Festival", startMonth:9, startDay:12, endMonth:9, endDay:12,
+      loc:"Lake Nokomis, Minneapolis", notes:"Monarch butterfly celebration.", lat:44.9083, lng:-93.2397 },
+    { name:"State Fair (Carver County)", startMonth:8, startDay:15, endMonth:8, endDay:23,
+      loc:"Waconia (approximate — check dates)", notes:"County fair with rides, animals, food.", lat:44.8508, lng:-93.7869 },
+    { name:"Apple Days", startMonth:9, startDay:19, endMonth:9, endDay:20,
+      loc:"Excelsior", notes:"Apple festival in charming Excelsior.", lat:44.9036, lng:-93.5660 },
+    { name:"Nickle Dickle Days", startMonth:9, startDay:12, endMonth:9, endDay:13,
+      loc:"Waconia", notes:"Community festival.", lat:44.8508, lng:-93.7869 },
+  ],
+  // recurring weekly events: day 0=Sun, 6=Sat
+  recurring: [
+    { name:"Jackson Roundhouse Train Rides", day:6, // Saturday
+      loc:"St. Paul", notes:"Saturday train rides only — call to confirm schedule.", lat:44.9458, lng:-93.1189 },
+    { name:"Minneapolis Farmers Market", day:6,
+      loc:"Minneapolis (Lyndale Ave N)", notes:"Saturdays are the biggest market day. Also open other days.", lat:44.9828, lng:-93.2864 },
+    { name:"Hopkins Farmers Market", day:6,
+      loc:"Hopkins", notes:"Check local schedule for exact times.", lat:44.9250, lng:-93.4116 },
+    { name:"Chanhassen Farmers Market", day:6,
+      loc:"Chanhassen", notes:"Saturday morning farmers market.", lat:44.8619, lng:-93.5308 },
+    { name:"Lake Harriet Trolley", day:6,
+      loc:"Minneapolis (Lake Harriet)", notes:"Historic streetcar runs on weekends. Free! Great for toddlers.", lat:44.9233, lng:-93.3108, free:true },
+    { name:"Lake Harriet Trolley", day:0,
+      loc:"Minneapolis (Lake Harriet)", notes:"Historic streetcar runs on weekends. Free!", lat:44.9233, lng:-93.3108, free:true },
+    { name:"Wayzata Trolley Rides", day:6,
+      loc:"Wayzata", notes:"Weekend trolley rides — call ahead for schedule.", lat:44.9744, lng:-93.5077 },
+    { name:"Excelsior Trolley Rides", day:0,
+      loc:"Excelsior", notes:"Trolley rides along the lake — charming!", lat:44.9036, lng:-93.5660 },
+    { name:"Canterbury Downs Family Day", day:0, // Sunday
+      loc:"Shakopee", notes:"Free or discounted admission on Sundays. Check for special events!", lat:44.7741, lng:-93.4689 },
+    { name:"Twins Kids Day (check schedule)", day:0,
+      loc:"Target Field, Minneapolis", notes:"Kids Day on Sundays when home. Verify game schedule at twinsbaseball.com.", lat:44.9817, lng:-93.2783, paid:true },
+    { name:"Staring Lake Kids' Concerts (Tues)", day:2, // Tuesday — not this weekend
+      loc:"Eden Prairie", notes:"Tuesday mornings at 10:30am at the amphitheater.", lat:44.8333, lng:-93.4422 },
+    { name:"Centennial Lakes Farmers Market", day:4, // Thursday
+      loc:"Edina", notes:"Thursdays 4-7pm. Concerts and fishing too.", lat:44.8756, lng:-93.3321 },
+    { name:"Moir Park Concert Series", day:1, // Monday
+      loc:"Bloomington", notes:"Monday evening concert series.", lat:44.8408, lng:-93.3771 },
+  ],
+  // always great on a weekend
+  alwaysOpen: [
+    { name:"Como Zoo & Conservatory", loc:"St. Paul", notes:"Free! Great for all ages.", lat:44.9822, lng:-93.1494, free:true },
+    { name:"Minnehaha Falls + Wabun Wading Pool", loc:"Minneapolis", notes:"Free and beautiful. Wading pool nearby!", lat:44.9153, lng:-93.2108, free:true },
+    { name:"Mall of America", loc:"Bloomington", notes:"Sea Life, Crayola Experience, Build-a-Bear, amusement park.", lat:44.8549, lng:-93.2422 },
+    { name:"Franconia Sculpture Park", loc:"Near Taylors Falls", notes:"Free! Outdoor sculpture in a beautiful natural setting.", lat:45.3914, lng:-92.7875, free:true },
+    { name:"Walker Art Center / Sculpture Garden", loc:"Minneapolis", notes:"Sculpture garden is free. First Saturday of month free for kids inside.", lat:44.9686, lng:-93.2886 },
+    { name:"Any Three Rivers Park District park", loc:"Twin Cities Metro", notes:"Beaches, trails, nature centers. threeriversparks.org for hours.", lat:44.8597, lng:-93.6558, free:true },
+    { name:"Wild Rumpus Bookstore", loc:"Minneapolis", notes:"Magical children's bookstore — call ahead for hours!", lat:44.9236, lng:-93.3097 },
+  ],
+};
+
+function getThisWeekend() {
+  const today = new Date();
+  const day = today.getDay();
+  let saturday = new Date(today);
+  let sunday = new Date(today);
+  if (day === 6) { sunday.setDate(today.getDate() + 1); }
+  else if (day === 0) { saturday.setDate(today.getDate() - 1); }
+  else {
+    saturday.setDate(today.getDate() + (6 - day));
+    sunday.setDate(saturday.getDate() + 1);
+  }
+  return { saturday, sunday };
+}
+
+function isThisWeekend(ev, saturday, sunday) {
+  const satYear = saturday.getFullYear();
+  const satMo = saturday.getMonth() + 1;
+  const satDay = saturday.getDate();
+  const sunMo = sunday.getMonth() + 1;
+  const sunDay = sunday.getDate();
+
+  const startBefore = (ev.startMonth < satMo) ||
+    (ev.startMonth === satMo && ev.startDay <= satDay);
+  const endAfter = (ev.endMonth > sunMo) ||
+    (ev.endMonth === sunMo && ev.endDay >= sunDay) ||
+    (ev.endMonth === satMo && ev.endDay >= satDay);
+  return startBefore && endAfter;
+}
+
+function renderWeekend() {
+  const container = document.getElementById('weekendContent');
+  const { saturday, sunday } = getThisWeekend();
+
+  const satStr = saturday.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  const sunStr = sunday.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+  const satFestivals = weekendEventsData.dateBased.filter(e => isThisWeekend(e, saturday, sunday));
+  const satEvents = weekendEventsData.recurring.filter(e => e.day === 6);
+  const sunEvents = weekendEventsData.recurring.filter(e => e.day === 0);
+
+  function eventCard(e, pill, highlight) {
+    const tags = [];
+    if (e.free) tags.push(`<span class="tag tag-free">Free</span>`);
+    if (e.paid) tags.push(`<span class="tag tag-paid">Paid</span>`);
+    const card = document.createElement('div');
+    card.className = `weekend-event${highlight ? ' highlight-card' : ''}`;
+    card.innerHTML = `<div class="we-name">${e.name}</div>
+      <div class="we-loc">${e.loc}</div>
+      ${e.notes ? `<div class="we-note">${e.notes}</div>` : ''}
+      ${tags.length ? `<div class="ac-tags" style="margin-top:4px">${tags.join('')}</div>` : ''}`;
+    if (e.lat) {
+      card.addEventListener('click', () => {
+        map.setView([e.lat, e.lng], 14);
+        const found = markers.find(m => Math.abs(m.activity.lat - e.lat) < 0.001 && Math.abs(m.activity.lng - e.lng) < 0.001);
+        if (found) found.marker.openPopup();
+      });
+    }
+    return card;
+  }
+
+  function group(title, pill, items, highlight) {
+    if (!items.length) return null;
+    const div = document.createElement('div');
+    div.className = 'weekend-group';
+    div.innerHTML = `<div class="weekend-group-header">${title} <span class="day-pill${pill==='sunday'?' sunday':pill==='both'?' both':''}">${pill.toUpperCase()}</span></div>`;
+    items.forEach(e => div.appendChild(eventCard(e, pill, highlight)));
+    return div;
+  }
+
+  container.innerHTML = `
+    <div class="weekend-banner">
+      <h2>This Weekend</h2>
+      <p>${satStr} &ndash; ${sunStr}</p>
+    </div>`;
+
+  if (satFestivals.length) {
+    const g = group("Festivals & Special Events", "both", satFestivals, true);
+    if (g) container.appendChild(g);
+  } else {
+    const none = document.createElement('div');
+    none.style.cssText = 'font-size:0.8rem;color:#94a3b8;padding:8px 0 12px;font-style:italic';
+    none.textContent = 'No major festivals this specific weekend — check upcoming dates below!';
+    container.appendChild(none);
+  }
+
+  const sg = group("Saturday Happenings", "saturday", satEvents, false);
+  if (sg) container.appendChild(sg);
+
+  const sg2 = group("Sunday Happenings", "sunday", sunEvents, false);
+  if (sg2) container.appendChild(sg2);
+
+  const ag = group("Always Great on a Weekend", "both", weekendEventsData.alwaysOpen, false);
+  if (ag) container.appendChild(ag);
+
+  // Upcoming festivals
+  const today2 = new Date();
+  const upcoming = weekendEventsData.dateBased.filter(e => {
+    const eventDate = new Date(today2.getFullYear(), e.startMonth - 1, e.startDay);
+    return eventDate > sunday;
+  }).sort((a, b) => {
+    const da = new Date(today2.getFullYear(), a.startMonth - 1, a.startDay);
+    const db = new Date(today2.getFullYear(), b.startMonth - 1, b.startDay);
+    return da - db;
+  });
+
+  if (upcoming.length) {
+    const upDiv = document.createElement('div');
+    upDiv.className = 'weekend-group';
+    upDiv.innerHTML = `<div class="weekend-group-header">Coming Up This Summer <span class="day-pill both">SOON</span></div>`;
+    upcoming.forEach(e => {
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateStr = `${months[e.startMonth-1]} ${e.startDay}${e.startDay !== e.endDay || e.startMonth !== e.endMonth ? ` – ${months[e.endMonth-1]} ${e.endDay}` : ''}`;
+      const card = document.createElement('div');
+      card.className = 'weekend-event';
+      card.innerHTML = `<div class="we-name">${e.name}</div>
+        <div class="we-loc" style="font-weight:600;color:#1a6b3a">${dateStr} &bull; ${e.loc}</div>
+        ${e.notes ? `<div class="we-note">${e.notes}</div>` : ''}`;
+      if (e.lat) {
+        card.addEventListener('click', () => map.setView([e.lat, e.lng], 13));
+      }
+      upDiv.appendChild(card);
+    });
+    container.appendChild(upDiv);
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const tabs = ['filters','weekend','list','athome','websites'];
+    b.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderCategoryFilters();
+renderMarkers();
+renderActivityList();
+renderAtHome();
+renderWebsites();
+renderWeekend();
+</script>
+</body>
+</html>
